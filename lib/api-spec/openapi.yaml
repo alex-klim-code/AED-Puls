@@ -1,0 +1,2133 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: AED Puls — fundament platformy otwartych danych AED. Dane demo nie są danymi ratunkowymi.
+servers:
+  - url: /api
+paths:
+  /open-data/harvest.md5:
+    get:
+      operationId: getHarvestMd5
+      summary: Publiczna suma MD5 dokumentu XML harvestera MCOD
+      responses:
+        "200":
+          description: MD5 dokładnych bajtów UTF-8 harvest.xml, bez logowania
+          content:
+            text/plain:
+              schema: { type: string, minLength: 32, maxLength: 32, pattern: "^[a-f0-9]{32}$" }
+  /open-data/harvest.xml:
+    get:
+      operationId: getHarvestXml
+      summary: Publiczny katalog XML dla harvestera MCOD
+      description: Jeden zbiór i zasób istniejącego eksportu CSV. Schemat urn:otwarte-dane:harvester:1.13 z oficjalnego otwarte_dane_latest.xsd; bez wspólnego przelicencjonowania danych.
+      responses:
+        "200":
+          description: Metadane dopuszczonych do publicznego eksportu AED; bez wymagania logowania
+          content:
+            application/xml:
+              schema: { type: string }
+  /provider/red-map/status:
+    get:
+      operationId: getRedMapStatus
+      responses:
+        "200":
+          description: Dostępność obliczania zasięgu pieszego dla organizacji
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RedMapStatus" }
+  /provider/red-map/analysis:
+    post:
+      operationId: analyseRedMap
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RedMapAreaInput" }
+      responses:
+        "200":
+          description: Pokrycie wybranego obszaru według tras pieszych, bez domniemywania brakujących wyników
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RedMapAnalysis" }
+  /data-catalogue:
+    get:
+      operationId: getDataCatalogue
+      responses:
+        "200":
+          description: Publiczny wykaz rzeczywistych zbiorów oraz prezentacja istniejącego standardu
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataCatalogue" }
+  /mcod/workspace:
+    get:
+      operationId: getMcodWorkspace
+      responses:
+        "200":
+          description: Lokalny panel integracji bez połączenia z MCOD
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McodWorkspace" }
+  /mcod/institutions:
+    get:
+      operationId: listMcodInstitutions
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: search, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Lokalna pamięć rzeczywiście pobranych instytucji
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McodInstitutionPage" }
+  /admin/mcod/institutions/refresh:
+    post:
+      operationId: refreshMcodInstitutions
+      responses:
+        "200":
+          description: Odświeżono pamięć instytucji po aktywacji
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McodActionResult" }
+  /mcod/institution-requests:
+    post:
+      operationId: submitMcodInstitutionRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/McodInstitutionApplication" }
+      responses:
+        "201":
+          description: Zapisano lokalny wniosek do weryfikacji
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McodEntity" }
+  /admin/mcod/institution-requests/{id}/review:
+    post:
+      operationId: reviewMcodInstitutionRequest
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/McodInstitutionReview" }
+      responses:
+        "200":
+          description: Zweryfikowano reprezentanta lokalnie, bez tworzenia instytucji w MCOD
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McodEntity" }
+  /admin/mcod/institution-requests/{id}/execute:
+    post:
+      operationId: executeMcodInstitutionRequest
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: MCOD potwierdził rzeczywiste powiązanie lub utworzenie instytucji
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McodEntity" }
+  /mcod/datasets:
+    post:
+      operationId: prepareMcodDataset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/McodDatasetDraft" }
+      responses:
+        "201":
+          description: Zapisano lokalny projekt zbioru
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McodEntity" }
+  /mcod/publications:
+    post:
+      operationId: prepareMcodPublication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/McodPublicationDraft" }
+      responses:
+        "201":
+          description: Zapisano niezmienny plan publikacji i raport walidacji
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McodEntity" }
+  /mcod/publications/{id}/download:
+    get:
+      operationId: downloadMcodPublication
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Plik wygenerowany lokalnie z utrwalonego planu
+          content:
+            text/csv:
+              schema: { type: string }
+            application/geo+json:
+              schema: { type: string }
+  /mcod/publications/{id}/execute:
+    post:
+      operationId: executeMcodPublication
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Publikacja potwierdzona przez MCOD
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McodEntity" }
+  /mcod/aed-drafts:
+    post:
+      operationId: saveMcodAedDraft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/McodAedDraftInput" }
+      responses:
+        "201":
+          description: Zapisano lokalny szkic AED, bez publikacji na mapie
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McodEntity" }
+  /mcod/aed-drafts/{id}:
+    put:
+      operationId: updateMcodAedDraft
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/McodAedDraftInput" }
+      responses:
+        "200":
+          description: Zaktualizowano szkic
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McodEntity" }
+  /mcod/aed-drafts/{id}/submit:
+    post:
+      operationId: submitMcodAedDraft
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/McodDraftSubmission" }
+      responses:
+        "200":
+          description: Przekazano istniejącemu systemowi moderacji AED
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McodEntity" }
+  /admin/mcod/sync:
+    post:
+      operationId: syncMcodAeds
+      responses:
+        "200":
+          description: Wynik ręcznie uruchomionej synchronizacji po aktywacji
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McodEntity" }
+  /admin/mcod/status:
+    get:
+      operationId: getMcodIntegrationStatus
+      description: Lokalny stan konfiguracji. Nie wykonuje żadnego połączenia z MCOD.
+      responses:
+        "200":
+          description: Konfiguracja integracji (tylko ADMIN)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McodIntegrationStatus" }
+        "401":
+          description: Wymagane logowanie
+        "403":
+          description: Wymagana rola ADMIN
+  /admin/mcod/contract:
+    post:
+      operationId: inspectMcodContract
+      description: Ręczny odczyt OpenAPI, dostępny dopiero po włączeniu integracji. Bez zapisu do MCOD.
+      responses:
+        "200":
+          description: Operacje zadeklarowane w pobranej specyfikacji, bez potwierdzenia uprawnień do ich wykonania
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McodContractInspection" }
+        "401":
+          description: Wymagane logowanie
+        "403":
+          description: Wymagana rola ADMIN lub poprawna ochrona CSRF
+        "503":
+          description: Integracja wyłączona lub brak konfiguracji
+        "502":
+          description: Nie udało się odczytać lub zweryfikować specyfikacji
+  /healthz:
+    get:
+      operationId: healthCheck
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthStatus" }
+  /auth/session:
+    get:
+      operationId: getSession
+      responses:
+        "200":
+          description: Sesja i konfiguracja
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Session" }
+  /auth/demo:
+    post:
+      operationId: demoLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DemoInput" }
+      responses:
+        "200":
+          description: Sesja
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Session" }
+  /auth/logout:
+    post:
+      operationId: logout
+      responses:
+        "200":
+          description: Wylogowano
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthStatus" }
+  /map-points:
+    get:
+      operationId: listMapPoints
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, maximum: 100000, default: 1 } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: accessibility, in: query, schema: { type: string } }
+        - { name: verificationStatus, in: query, schema: { type: string } }
+        - { name: sourceId, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 20000 } }
+      responses:
+        "200":
+          description: Lekkie punkty centralnego rejestru bez pełnych opisów i dokumentów źródłowych
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/MapPoint" } }
+  /admin/records:
+    get:
+      operationId: listAdminRecords
+      parameters:
+        - { name: missingLocation, in: query, schema: { type: boolean, default: false } }
+        - { name: needsLocationReview, in: query, schema: { type: boolean, default: false } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: search, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Wszystkie rekordy administratora, także niekompletne i bez lokalizacji
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminRecordPage" }
+  /admin/aeds/{id}:
+    patch:
+      operationId: updateAdminRecord
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminRecordUpdateInput" }
+      responses:
+        "200":
+          description: Uzupełniony rekord; zmiana nie zatwierdza urządzenia
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Aed" }
+  /admin/aeds/{id}/history:
+    get:
+      operationId: getAdminRecordHistory
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Historia uzupełnień i decyzji, bez usuwania oryginałów źródłowych
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/AedEditEvent" } }
+  /aeds:
+    get:
+      operationId: listAeds
+      parameters:
+        - { name: search, in: query, schema: { type: string } }
+        - { name: accessibility, in: query, schema: { type: string } }
+        - { name: verificationStatus, in: query, schema: { type: string } }
+        - { name: demo, in: query, schema: { type: boolean } }
+        - { name: sourceId, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 20000 } }
+      responses:
+        "200":
+          description: Zatwierdzone AED
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Aed" } }
+    post:
+      operationId: submitAed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AedProposalInput" }
+      responses:
+        "201":
+          description: Zgłoszenie przyjęte
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AedProposal" }
+  /aed-proposals:
+    get:
+      operationId: listAedProposals
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: Zgłoszenia widoczne w ramach uprawnień konta
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AedProposalPage" }
+  /aed-proposals/{id}:
+    put:
+      operationId: resubmitAedProposal
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProposalResubmission" }
+      responses:
+        "200":
+          description: Uzupełniono zgłoszenie i skierowano ponownie do weryfikacji
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AedProposal" }
+    get:
+      operationId: getAedProposal
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Szczegóły i historia zgłoszenia
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AedProposal" }
+  /admin/aed-proposals/{id}/review:
+    post:
+      operationId: reviewAedProposal
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AedProposalDecision" }
+      responses:
+        "200":
+          description: Decyzja i ewentualnie nowy rekord AED
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AedProposal" }
+  /admin/aed-proposals/{id}/duplicates:
+    get:
+      operationId: findProposalDuplicates
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Możliwe duplikaty do ręcznej oceny
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Aed" } }
+  /submission-threads/{kind}/{id}:
+    get:
+      operationId: getSubmissionThread
+      parameters:
+        - { name: kind, in: path, required: true, schema: { type: string, enum: [AED, ERROR] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Prywatna rozmowa i historia
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubmissionThread" }
+    post:
+      operationId: addSubmissionComment
+      parameters:
+        - { name: kind, in: path, required: true, schema: { type: string, enum: [AED, ERROR] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmissionCommentInput" }
+      responses:
+        "201":
+          description: Dodano komentarz
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubmissionComment" }
+  /submission-photos/uploads:
+    post:
+      operationId: requestSubmissionPhoto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmissionPhotoInput" }
+      responses:
+        "201":
+          description: Prywatny jednorazowy obszar przesyłania
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubmissionPhotoUpload" }
+  /submission-photos/{id}/complete:
+    post:
+      operationId: completeSubmissionPhoto
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Zdjęcie zweryfikowane i oczyszczone z metadanych
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubmissionPhoto" }
+  /submission-photos/{id}:
+    get:
+      operationId: getSubmissionPhoto
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Zdjęcie dostępne wyłącznie uprawnionym osobom
+          content:
+            image/webp:
+              schema: { type: string, format: binary }
+  /aed-proposals/template.xlsx:
+    get:
+      operationId: downloadAedProposalTemplate
+      responses:
+        "200":
+          description: Pusty wzór XLSX wraz z instrukcją
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+  /aed-proposals/import:
+    post:
+      operationId: importAedProposals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AedProposalFile" }
+      responses:
+        "201":
+          description: Wiersze zapisano wyłącznie w kolejce administratora
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AedProposalImportResult" }
+  /conflict-reports:
+    get:
+      operationId: listConflictReports
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: Zgłoszenia błędów w zakresie uprawnień konta
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConflictReportPage" }
+  /conflict-reports/{id}:
+    get:
+      operationId: getConflictReport
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Błąd i powiązany rekord AED
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConflictReport" }
+  /admin/conflict-reports/{id}/review:
+    post:
+      operationId: reviewConflictReport
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConflictReportDecision" }
+      responses:
+        "200":
+          description: Rozpatrzono błąd, bez automatycznej zmiany danych AED
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConflictReport" }
+  /submission-location:
+    post:
+      operationId: createSubmissionLocation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmissionLocationRequest" }
+      responses:
+        "200":
+          description: Odczyt GPS z automatycznym adresem i krótkotrwałym potwierdzeniem dla zgłoszenia
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubmissionLocation" }
+  /admin/integrations:
+    get:
+      operationId: getIntegrationPanel
+      parameters:
+        - { name: sourceId, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: Źródła, importy i kontrola jakości
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IntegrationPanel" }
+  /admin/sync:
+    post:
+      operationId: startSourceSync
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SyncInput" }
+      responses:
+        "202":
+          description: Synchronizacja uruchomiona
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SyncStarted" }
+  /admin/source-test:
+    post:
+      operationId: testSourceConnection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConnectionTestInput" }
+      responses:
+        "200":
+          description: Rzeczywista próba pobrania bez importowania AED
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sourceId, status, message, checkedAt, recordCount]
+                properties:
+                  sourceId: { type: string }
+                  status: { type: string }
+                  message: { type: string }
+                  checkedAt: { type: string }
+                  recordCount: { type: integer }
+  /admin/resolve-duplicate:
+    post:
+      operationId: resolveDuplicate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DuplicateDecision" }
+      responses:
+        "200":
+          description: Zapisano decyzję
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthStatus" }
+  /admin/resolve-conflict:
+    post:
+      operationId: resolveDataConflict
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConflictDecision" }
+      responses:
+        "200":
+          description: Zapisano decyzję
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthStatus" }
+  /provenance:
+    get:
+      operationId: getAedProvenance
+      parameters:
+        - { name: aedId, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Pochodzenie publicznego rekordu
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Provenance" } }
+  /nearby-aeds:
+    get:
+      operationId: getNearbyAeds
+      description: Rzeczywiste wpisy OpenStreetMap w promieniu 5 km. Nie są potwierdzone przez AED Puls.
+      parameters:
+        - { name: latitude, in: query, required: true, schema: { type: number, minimum: -85, maximum: 85 } }
+        - { name: longitude, in: query, required: true, schema: { type: number, minimum: -180, maximum: 180 } }
+      responses:
+        "200":
+          description: Dane społeczności OpenStreetMap
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NearbyAeds" }
+        "503":
+          description: Źródło danych chwilowo niedostępne
+  /aeds/{id}:
+    get:
+      operationId: getAed
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Szczegóły
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Aed" }
+  /reports:
+    post:
+      operationId: createReport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReportInput" }
+      responses:
+        "201":
+          description: Przyjęto
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthStatus" }
+  /stats:
+    get:
+      operationId: getStats
+      parameters:
+        - { name: demo, in: query, schema: { type: boolean } }
+      responses:
+        "200":
+          description: Liczniki z bazy
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Stats" }
+  /sources:
+    get:
+      operationId: listSources
+      responses:
+        "200":
+          description: Statusy źródeł
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Source" } }
+  /source-directory:
+    get:
+      operationId: getSourceDirectory
+      responses:
+        "200":
+          description: Uporządkowany widok zbiorów, katalogów i źródeł pomocniczych; nie zmienia historii integracji.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries, integrationCount, independentPublisherCount]
+                properties:
+                  entries: { type: array, items: { $ref: "#/components/schemas/SourceDirectoryEntry" } }
+                  integrationCount: { type: integer }
+                  independentPublisherCount: { type: integer }
+  /workspace:
+    get:
+      operationId: getWorkspace
+      responses:
+        "200":
+          description: Dane właściwe dla roli i organizacji
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Workspace" }
+  /admin/aeds/{id}/review:
+    post:
+      operationId: reviewAed
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReviewInput" }
+      responses:
+        "200":
+          description: Zaktualizowano
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Aed" }
+  /export-providers:
+    get:
+      operationId: listExportProviders
+      parameters:
+        - { name: scope, in: query, schema: { type: string, enum: [public, approved, review], default: public } }
+      responses:
+        "200":
+          description: Źródła, AED Puls i organizacje; liczby unikalnych AED dostępnych do pobrania
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/ExportProvider" } }
+  /export-preview:
+    get:
+      operationId: getExportPreview
+      parameters:
+        - { name: licenses, in: query, schema: { type: string }, description: "Identyfikatory licencji oddzielone przecinkami. Nie łącz z parametrem license." }
+        - { name: license, in: query, schema: { type: string, enum: [CC0-1.0, CC-BY-4.0, ODbL-1.0] }, description: Filtr oryginalnej licencji publikacji }
+        - { name: providerIds, in: query, schema: { type: string }, description: Identyfikatory dostawców oddzielone przecinkami; brak parametru oznacza wszystkich }
+        - { name: scope, in: query, schema: { type: string, enum: [public, approved, review], default: public } }
+      responses:
+        "200":
+          description: Podsumowanie wybranego zbioru, bez tworzenia pliku
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExportPreview" }
+  /exports/csv:
+    get:
+      operationId: downloadCsvDataset
+      description: Jeden rekord na AED, wyłącznie wybrani dostawcy, wspólna struktura wszystkich formatów. Zakres public obejmuje widoczne importy ze statusem niezweryfikowanym.
+      parameters:
+        - { name: licenses, in: query, schema: { type: string }, description: "Wiele licencji oddzielonych przecinkami. Nie łącz z license." }
+        - { name: license, in: query, schema: { type: string, enum: [CC0-1.0, CC-BY-4.0, ODbL-1.0] }, description: "Opcjonalny filtr. Z providerIds lub scope=public brak filtra oznacza wszystkie znane licencje zachowane przy publikacjach. Stary URL bez tych parametrów domyślnie wybiera CC0-1.0." }
+        - { name: scope, in: query, schema: { type: string, enum: [public, approved, review], default: approved } }
+        - { name: providerIds, in: query, schema: { type: string } }
+        - { name: demo, in: query, schema: { type: boolean, default: false } }
+      responses:
+        "200":
+          description: Plik UTF-8; CSV zabezpieczony przed formułami arkuszy kalkulacyjnych
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+  /exports/xlsx:
+    get:
+      operationId: downloadXlsxDataset
+      description: Skoroszyt XLSX z jednolitymi rekordami AED, obowiązkową atrybucją, warunkami licencji i raportem walidacji.
+      parameters:
+        - { name: licenses, in: query, schema: { type: string } }
+        - { name: license, in: query, schema: { type: string, enum: [CC0-1.0, CC-BY-4.0, ODbL-1.0] } }
+        - { name: scope, in: query, schema: { type: string, enum: [public, approved, review], default: approved } }
+        - { name: providerIds, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Kompletny skoroszyt Excel; jeden wiersz na kanoniczne AED
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+  /exports/json:
+    get:
+      operationId: downloadJsonDataset
+      parameters:
+        - { name: licenses, in: query, schema: { type: string }, description: "Wiele licencji oddzielonych przecinkami. Nie łącz z license." }
+        - { name: license, in: query, schema: { type: string, enum: [CC0-1.0, CC-BY-4.0, ODbL-1.0] }, description: "Opcjonalny filtr. Z providerIds lub scope=public brak filtra oznacza wszystkie znane licencje zachowane przy publikacjach. Stary URL bez tych parametrów domyślnie wybiera CC0-1.0." }
+        - { name: scope, in: query, schema: { type: string, enum: [public, approved, review], default: approved } }
+        - { name: providerIds, in: query, schema: { type: string } }
+        - { name: demo, in: query, schema: { type: boolean, default: false } }
+      responses:
+        "200":
+          description: Jednolity rekord na AED, dane wybranych dostawców i indywidualne licencje publikacji
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/ExportRecord" } }
+  /exports/geojson:
+    get:
+      operationId: downloadGeojsonDataset
+      parameters:
+        - { name: licenses, in: query, schema: { type: string }, description: "Wiele licencji oddzielonych przecinkami. Nie łącz z license." }
+        - { name: license, in: query, schema: { type: string, enum: [CC0-1.0, CC-BY-4.0, ODbL-1.0] }, description: "Opcjonalny filtr. Z providerIds lub scope=public brak filtra oznacza wszystkie znane licencje zachowane przy publikacjach. Stary URL bez tych parametrów domyślnie wybiera CC0-1.0." }
+        - { name: scope, in: query, schema: { type: string, enum: [public, approved, review], default: approved } }
+        - { name: providerIds, in: query, schema: { type: string } }
+        - { name: demo, in: query, schema: { type: boolean, default: false } }
+      responses:
+        "200":
+          description: FeatureCollection WGS84; properties ma dokładnie te same pola co CSV i JSON, również latitude i longitude
+          content:
+            application/geo+json:
+              schema: { type: object, additionalProperties: true }
+  /device-assessment:
+    post:
+      operationId: assessDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DeviceAssessment" }
+      responses:
+        "200":
+          description: Zapisano niezależną ocenę urządzenia i dowód
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Aed" }
+  /exports/zip:
+    get:
+      operationId: downloadExportBundle
+      description: "Paczka z aed_data.csv, sources.csv, LICENSES.txt i validation_report.json. Także raport zera rekordów; zawsze ta sama kontrola praw co w pozostałych formatach."
+      parameters:
+        - { name: licenses, in: query, schema: { type: string } }
+        - { name: license, in: query, schema: { type: string, enum: [CC0-1.0, CC-BY-4.0, ODbL-1.0] } }
+        - { name: scope, in: query, schema: { type: string, enum: [public, approved, review], default: public } }
+        - { name: providerIds, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Archiwum ZIP zawierające dane dopuszczone do eksportu i raport wszystkich pominięć
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+  /metadata:
+    get:
+      operationId: getDatasetMetadata
+      parameters:
+        - { name: licenses, in: query, schema: { type: string } }
+        - { name: license, in: query, schema: { type: string, enum: [CC0-1.0, CC-BY-4.0, ODbL-1.0] }, description: Filtr oryginalnej licencji publikacji }
+        - { name: demo, in: query, schema: { type: boolean, default: false } }
+        - { name: scope, in: query, schema: { type: string, enum: [public, approved, review], default: approved } }
+        - { name: providerIds, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Projekt metadanych, nie potwierdzenie zgodności urzędowej
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /standard.xlsx:
+    get:
+      operationId: downloadDataStandard
+      responses:
+        "200":
+          description: aed_data_standard.xlsx — standard danych i instrukcja
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+  /openapi.json:
+    get:
+      operationId: getApiDocumentation
+      responses:
+        "200":
+          description: Specyfikacja OpenAPI
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /organizations/search:
+    get:
+      operationId: searchGovernmentOrganizations
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 2, maxLength: 120 } }
+      responses:
+        "200":
+          description: Instytucje z lokalnej bazy lub oficjalnego wyszukiwania dane.gov.pl
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/GovernmentEntity" } }
+  /organizations/my:
+    get:
+      operationId: getMyGovernmentOrganizations
+      responses:
+        "200":
+          description: Własne wnioski i dostępne profile organizacji
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GovernmentMemberships" }
+  /organizations/{id}:
+    get:
+      operationId: getGovernmentOrganization
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Lokalna instytucja i status importu
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GovernmentEntity" }
+  /organizations/{id}/import:
+    post:
+      operationId: importGovernmentOrganization
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Import zlecony w tle, bez blokowania konta
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GovernmentEntity" }
+  /organizations/{id}/claim:
+    post:
+      operationId: claimGovernmentOrganization
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GovernmentClaimInput" }
+      responses:
+        "200":
+          description: Wniosek PENDING bez przyznania uprawnień
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GovernmentEntity" }
+  /organizations/{id}/switch:
+    post:
+      operationId: switchGovernmentOrganization
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Profil zmieniony wyłącznie po zatwierdzeniu przedstawiciela
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthStatus" }
+  /organizations/{id}/datasets:
+    get:
+      operationId: listGovernmentOrganizationDatasets
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Lokalnie zapisane zbiory instytucji
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/GovernmentEntity" } }
+  /datasets/{id}/resources:
+    get:
+      operationId: listGovernmentDatasetResources
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Lokalnie zapisane zasoby zbioru
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/GovernmentEntity" } }
+  /admin/organization-claims:
+    get:
+      operationId: listGovernmentOrganizationClaims
+      responses:
+        "200":
+          description: Wnioski przedstawicieli dla administratora
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/GovernmentEntity" } }
+  /admin/organization-claims/{id}/approve:
+    post:
+      operationId: approveGovernmentOrganizationClaim
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GovernmentClaimReview" }
+      responses:
+        "200":
+          description: Przedstawiciel zatwierdzony lokalnie
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthStatus" }
+  /admin/organization-claims/{id}/reject:
+    post:
+      operationId: rejectGovernmentOrganizationClaim
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GovernmentClaimReview" }
+      responses:
+        "200":
+          description: Wniosek odrzucony bez nadania uprawnień
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthStatus" }
+components:
+  schemas:
+    RedMapAreaInput:
+      type: object
+      required: [latitude, longitude, sizeKm]
+      properties:
+        latitude: { type: number, minimum: 49, maximum: 55 }
+        longitude: { type: number, minimum: 14, maximum: 24.2 }
+        sizeKm: { type: integer, enum: [2, 4, 6] }
+    RedMapGeometry:
+      type: object
+      required: [type, coordinates]
+      properties:
+        type: { type: string, enum: [MultiPolygon] }
+        coordinates:
+          type: array
+          items:
+            type: array
+            items:
+              type: array
+              items:
+                type: array
+                items: { type: number }
+    RedMapStatus:
+      type: object
+      required: [configured, dailyRemaining, maxNewRequests, seconds]
+      properties:
+        configured: { type: boolean }
+        dailyRemaining: { type: integer }
+        maxNewRequests: { type: integer }
+        seconds: { type: integer }
+    RedMapPoint:
+      type: object
+      required: [id, name, latitude, longitude]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+    RedMapAnalysis:
+      type: object
+      required: [complete, generatedAt, seconds, travelMode, area, covered, uncovered, unknown, aeds, candidateCount, analysedCount, newRequests, message, warnings]
+      properties:
+        complete: { type: boolean }
+        generatedAt: { type: string }
+        seconds: { type: integer }
+        travelMode: { type: string, enum: [walk] }
+        area: { $ref: "#/components/schemas/RedMapGeometry" }
+        covered: { $ref: "#/components/schemas/RedMapGeometry" }
+        uncovered: { $ref: "#/components/schemas/RedMapGeometry" }
+        unknown: { $ref: "#/components/schemas/RedMapGeometry" }
+        aeds: { type: array, items: { $ref: "#/components/schemas/RedMapPoint" } }
+        candidateCount: { type: integer }
+        analysedCount: { type: integer }
+        newRequests: { type: integer }
+        message: { type: string }
+        warnings: { type: array, items: { type: string } }
+    DataCatalogue:
+      type: object
+      required: [version, updatedAt, datasets, fields]
+      properties:
+        version: { type: string }
+        updatedAt: { type: string }
+        datasets: { type: array, items: { $ref: "#/components/schemas/DataCatalogueDataset" } }
+        fields: { type: array, items: { $ref: "#/components/schemas/DataCatalogueField" } }
+    DataCatalogueDataset:
+      type: object
+      required: [id, publisher, title, aggregation, formats, aedCount, updatedAt, licenses, averageQuality, statuses, url]
+      properties:
+        id: { type: string }
+        publisher: { type: string }
+        title: { type: string }
+        aggregation: { type: boolean }
+        formats: { type: array, items: { type: string } }
+        aedCount: { type: integer }
+        updatedAt: { type: [string, "null"] }
+        licenses: { type: array, items: { type: string } }
+        averageQuality: { type: [number, "null"] }
+        statuses: { type: array, items: { type: string } }
+        url: { type: [string, "null"] }
+    DataCatalogueField:
+      type: object
+      required: [name, description, type, sourcePresence, enrichment]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        type: { type: string }
+        sourcePresence: { type: string }
+        enrichment: { type: string }
+    GovernmentEntity:
+      type: object
+      required: [id, name, sourceUrl, metadata]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        sourceUrl: { type: string }
+        metadata: { type: object, additionalProperties: true }
+        organizationId: { type: [string, "null"] }
+        institutionId: { type: string }
+        datasetId: { type: string }
+        format: { type: string }
+        importStatus: { type: string }
+        importMessage: { type: string }
+        importedCount: { type: integer }
+        status: { type: string }
+        representative: { type: string }
+        evidence: { type: string }
+        note: { type: string }
+        userName: { type: string }
+    GovernmentMemberships:
+      type: object
+      required: [claims, activeOrganizationId]
+      properties:
+        claims: { type: array, items: { $ref: "#/components/schemas/GovernmentEntity" } }
+        activeOrganizationId: { type: [string, "null"] }
+    GovernmentClaimInput:
+      type: object
+      required: [representative, evidence]
+      properties:
+        representative: { type: string, minLength: 2, maxLength: 200 }
+        evidence: { type: string, minLength: 10, maxLength: 2000 }
+    GovernmentClaimReview:
+      type: object
+      required: [note, representativeVerified]
+      properties:
+        note: { type: string, minLength: 8, maxLength: 2000 }
+        representativeVerified: { type: boolean }
+    SourceCategory:
+      type: string
+      enum: [OFFICIAL_GOV_PL, OFFICIAL_LOCAL_GOVERNMENT, COMMUNITY_OPEN_DATA, ORGANIZATION_SUBMISSION, USER_SUBMISSION, UNKNOWN]
+    DeviceAssessment:
+      type: object
+      required: [aedId, recordVerificationStatus, operationalStatus, evidence]
+      properties:
+        aedId: { type: string, format: uuid }
+        recordVerificationStatus: { type: string, enum: [VERIFIED_BY_OPERATOR, VERIFIED_BY_AUTHORIZED_REVIEWER, UNVERIFIED, DISPUTED] }
+        operationalStatus: { type: string, enum: [OPERATIONAL, OUT_OF_SERVICE, UNKNOWN] }
+        verifiedAt: { type: string, format: date-time }
+        evidence: { type: string, minLength: 10, maxLength: 2000 }
+        evidenceUrl: { type: string, maxLength: 1000 }
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+    DemoInput:
+      type: object
+      required: [role]
+      properties:
+        role: { type: string, enum: [USER, ORGANIZATIONS, PROVIDER, ADMIN], description: "ORGANIZATIONS wybiera konto organizacji; PROVIDER pozostaje zgodnym wstecznie aliasem tej samej roli." }
+    Session:
+      type: object
+      required: [authenticated, demoEnabled, googleEnabled, csrfToken]
+      properties:
+        authenticated: { type: boolean }
+        demoEnabled: { type: boolean }
+        googleEnabled: { type: boolean }
+        csrfToken: { type: string }
+        user: { $ref: "#/components/schemas/User" }
+    User:
+      type: object
+      required: [id, name, role, isDemo]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        role: { type: string, enum: [USER, PROVIDER, ADMIN] }
+        isDemo: { type: boolean }
+        organizationId: { type: [string, "null"] }
+    ExportProvider:
+      type: object
+      required: [id, name, kind, status, recordCount, license]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        kind: { type: string, enum: [source, application, organization] }
+        status: { type: string }
+        recordCount: { type: integer }
+        license: { type: string }
+    ExportPreview:
+      type: object
+      required: [recordCount, publicationCount, providerIds, licenses, schemaVersion, fields, warnings, candidateRecordCount, skippedRecordCount, skippedPublicationCount, selectedLicenses, sources, reasons, policyVersion, legalDisclaimer, reportDownloadAvailable]
+      properties:
+        manualReviewCount: { type: integer }
+        decisionSamples: { type: array, items: { $ref: "#/components/schemas/ExportDecision" } }
+        candidateRecordCount: { type: integer }
+        skippedRecordCount: { type: integer }
+        skippedPublicationCount: { type: integer }
+        selectedLicenses: { type: array, items: { type: string } }
+        sources: { type: array, items: { $ref: "#/components/schemas/ExportSourceSummary" } }
+        reasons: { type: array, items: { $ref: "#/components/schemas/ExportSkipSummary" } }
+        policyVersion: { type: string }
+        legalDisclaimer: { type: string }
+        reportDownloadAvailable: { type: boolean }
+        recordCount: { type: integer }
+        publicationCount: { type: integer }
+        providerIds: { type: array, items: { type: string } }
+        licenses: { type: array, items: { type: string } }
+        schemaVersion: { type: string }
+        fields: { type: array, items: { type: string } }
+        warnings: { type: array, items: { type: string } }
+    ExportSourceSummary:
+      type: object
+      required: [id, name, license, recordCount, exportedRecordCount, skippedRecordCount]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        license: { type: string }
+        recordCount: { type: integer }
+        exportedRecordCount: { type: integer }
+        skippedRecordCount: { type: integer }
+    ExportSkipSummary:
+      type: object
+      required: [code, message, recordCount, publicationCount]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        recordCount: { type: integer }
+        publicationCount: { type: integer }
+    ExportAedFields:
+      type: object
+      required: [name, address, city, postalCode, voivodeship, country, latitude, longitude, completenessStatus, description, placement, accessibility, openingHours, deviceIdentifier, responsibleOrganization, sourceName, sourceUrl, license, sourceCategory, sourceOperationalClaim, qualityScore, qualityIssues]
+      properties:
+        completenessStatus: { type: string, enum: [COMPLETE, INCOMPLETE] }
+        name: { type: string }
+        address: { type: string }
+        city: { type: string }
+        postalCode: { type: [string, "null"] }
+        voivodeship: { type: [string, "null"] }
+        country: { type: string }
+        latitude: { type: [number, "null"] }
+        longitude: { type: [number, "null"] }
+        description: { type: [string, "null"] }
+        placement: { type: string }
+        accessibility: { type: string }
+        openingHours: { type: [string, "null"] }
+        deviceIdentifier: { type: [string, "null"] }
+        responsibleOrganization: { type: [string, "null"] }
+        sourceName: { type: string }
+        sourceUrl: { type: string }
+        license: { type: string }
+        sourceCategory: { type: string }
+        sourceOperationalClaim: { type: [string, "null"], description: "Deklaracja źródła, a nie udokumentowana ocena fizycznego urządzenia" }
+        qualityScore: { type: integer }
+        qualityIssues: { type: array, items: { type: string } }
+    ExportPublication:
+      type: object
+      required: [id, providerId, providerName, sourceRecordId, publisher, publisherId, datasetId, datasetTitle, datasetUrl, resourceId, importedAt, lastSyncedAt, sourceModifiedAt, reuseConditions, provenanceEvidence, data]
+      properties:
+        id: { type: string }
+        providerId: { type: string }
+        providerName: { type: string }
+        sourceRecordId: { type: string }
+        publisher: { type: [string, "null"] }
+        publisherId: { type: [string, "null"] }
+        datasetId: { type: [string, "null"] }
+        datasetTitle: { type: [string, "null"] }
+        datasetUrl: { type: [string, "null"] }
+        resourceId: { type: [string, "null"] }
+        importedAt: { type: string }
+        lastSyncedAt: { type: string }
+        sourceModifiedAt: { type: [string, "null"] }
+        reuseConditions: { type: object, additionalProperties: true }
+        provenanceEvidence: { type: object, additionalProperties: true }
+        data: { $ref: "#/components/schemas/ExportAedFields" }
+    ExportRecord:
+      allOf:
+        - { $ref: "#/components/schemas/ExportAedFields" }
+        - type: object
+          required: [id, schemaVersion, providerIds, providers, licenses, sources, fieldProvenance, verificationStatus, recordVerificationStatus, operationalStatus, verifiedAt, sourceConflict, createdAt, updatedAt]
+          properties:
+            fieldProvenance: { type: array, items: { $ref: "#/components/schemas/ExportFieldOrigin" } }
+            id: { type: string }
+            schemaVersion: { type: string }
+            providerIds: { type: array, items: { type: string } }
+            providers: { type: array, items: { type: string } }
+            licenses: { type: array, items: { type: string } }
+            sources: { type: array, items: { $ref: "#/components/schemas/ExportPublication" } }
+            verificationStatus: { type: string }
+            recordVerificationStatus: { type: string }
+            operationalStatus: { type: string }
+            verifiedAt: { type: [string, "null"] }
+            sourceConflict: { type: boolean }
+            createdAt: { type: string }
+            updatedAt: { type: string }
+    MapPoint:
+      type: object
+      required: [id, name, address, city, latitude, longitude, accessibility, verificationStatus, qualityScore, isDemo, sourceName, license, publicationCount, independentSourceCount, sourceConflict]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        address: { type: string }
+        city: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        accessibility: { type: string }
+        verificationStatus: { type: string, enum: [pending, verified, rejected, unverified] }
+        qualityScore: { type: integer }
+        isDemo: { type: boolean }
+        sourceName: { type: string }
+        license: { type: string }
+        sourceCategory: { $ref: "#/components/schemas/SourceCategory" }
+        publicationCount: { type: integer }
+        independentSourceCount: { type: integer }
+        sourceConflict: { type: boolean }
+    AedEditEvent:
+      type: object
+      required: [id, action, createdAt, details]
+      properties:
+        id: { type: string }
+        action: { type: string }
+        createdAt: { type: string }
+        details: { type: object, additionalProperties: true }
+    AdminRecordUpdateInput:
+      type: object
+      properties:
+        name: { type: string, maxLength: 160 }
+        address: { type: string, maxLength: 240 }
+        city: { type: string, maxLength: 120 }
+        postalCode: { type: [string, "null"], maxLength: 10 }
+        latitude: { type: [number, "null"], minimum: 49, maximum: 55 }
+        longitude: { type: [number, "null"], minimum: 14, maximum: 24.2 }
+        description: { type: [string, "null"], maxLength: 2000 }
+        openingHours: { type: [string, "null"], maxLength: 200 }
+        accessibility: { type: string, enum: [24/7, limited, unknown] }
+        placement: { type: string, enum: [indoor, outdoor, unknown] }
+        expectedUpdatedAt: { type: string }
+    AdminRecordPage:
+      type: object
+      required: [records, total, missingLocationCount, incompleteCount, locationReviewCount, page]
+      properties:
+        records: { type: array, items: { $ref: "#/components/schemas/Aed" } }
+        total: { type: integer }
+        missingLocationCount: { type: integer }
+        incompleteCount: { type: integer }
+        locationReviewCount: { type: integer }
+        page: { type: integer }
+    AedProposalInput:
+      type: object
+      required: [name, address, city, latitude, longitude, accessibility, sourceName, sourceUrl, license]
+      properties:
+        name: { type: string, maxLength: 160 }
+        address: { type: string, maxLength: 240 }
+        city: { type: string, maxLength: 120 }
+        postalCode: { type: string, maxLength: 10 }
+        voivodeship: { type: string, maxLength: 100 }
+        latitude: { type: [number, "null"], minimum: -90, maximum: 90 }
+        longitude: { type: [number, "null"], minimum: -180, maximum: 180 }
+        description: { type: string, maxLength: 2000 }
+        placement: { type: string, enum: [indoor, outdoor, unknown], default: unknown }
+        accessibility: { type: string, enum: [24/7, limited, unknown] }
+        openingHours: { type: string, maxLength: 200 }
+        sourceName: { type: string, maxLength: 200 }
+        sourceUrl: { type: string, maxLength: 1000 }
+        license: { type: string, maxLength: 200 }
+        submissionMethod: { type: string, enum: [MANUAL, GPS, FILE], default: MANUAL }
+        locationToken: { type: string, maxLength: 10000 }
+        publicationConsent: { type: boolean }
+        photoId: { type: [string, "null"] }
+    ProposalResubmission:
+      type: object
+      required: [revision, payload, note]
+      properties:
+        revision: { type: integer, minimum: 1 }
+        payload: { $ref: "#/components/schemas/AedProposalInput" }
+        note: { type: string, minLength: 3, maxLength: 2000 }
+    SubmissionPhotoInput:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name: { type: string, maxLength: 200 }
+        size: { type: integer, minimum: 1, maximum: 5242880 }
+        contentType: { type: string, enum: [image/jpeg, image/png, image/webp] }
+    SubmissionPhotoUpload:
+      type: object
+      required: [id, uploadURL]
+      properties:
+        id: { type: string }
+        uploadURL: { type: string }
+    SubmissionPhoto:
+      type: object
+      required: [id, url]
+      properties:
+        id: { type: string }
+        url: { type: string }
+    SubmissionCommentInput:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string, maxLength: 4000 }
+        photoId: { type: [string, "null"] }
+    SubmissionComment:
+      type: object
+      required: [id, body, author, authorRole, createdAt]
+      properties:
+        id: { type: string }
+        body: { type: string }
+        author: { type: string }
+        authorRole: { type: string }
+        createdAt: { type: string }
+        photoId: { type: [string, "null"] }
+    SubmissionThread:
+      type: object
+      required: [comments, history]
+      properties:
+        comments: { type: array, items: { $ref: "#/components/schemas/SubmissionComment" } }
+        history: { type: array, items: { $ref: "#/components/schemas/ProposalEvent" } }
+    ProposalEvent:
+      type: object
+      required: [id, action, createdAt, changes]
+      properties:
+        id: { type: string }
+        action: { type: string }
+        createdAt: { type: string }
+        changes: { type: object, additionalProperties: true }
+    AedProposal:
+      type: object
+      required: [id, status, submissionMethod, sourceName, submitterRole, payload, issues, reviewNote, revision, aedId, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [NEW, UNCOMPLETED, DONE, REJECTED] }
+        submissionMethod: { type: string, enum: [MANUAL, GPS, FILE] }
+        sourceName: { type: string }
+        submitterRole: { type: string }
+        payload: { $ref: "#/components/schemas/AedProposalInput" }
+        issues: { type: array, items: { type: string } }
+        reviewNote: { type: string }
+        revision: { type: integer }
+        aedId: { type: [string, "null"] }
+        targetAedId: { type: [string, "null"] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+        history: { type: array, items: { $ref: "#/components/schemas/ProposalEvent" } }
+        originalData: { type: object, additionalProperties: true }
+        photoId: { type: [string, "null"] }
+        submitterName: { type: string }
+    AedProposalPage:
+      type: object
+      required: [items, total, page]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/AedProposal" } }
+        total: { type: integer }
+        page: { type: integer }
+    AedProposalDecision:
+      type: object
+      required: [decision, revision, note]
+      properties:
+        decision: { type: string, enum: [SAVE, APPROVE, REJECT, REQUEST_INFO] }
+        revision: { type: integer, minimum: 1 }
+        note: { type: string, maxLength: 2000 }
+        payload: { $ref: "#/components/schemas/AedProposalInput" }
+    AedProposalFile:
+      type: object
+      required: [filename, contentBase64, publicationConsent]
+      properties:
+        filename: { type: string, maxLength: 150 }
+        contentBase64: { type: string, maxLength: 7000000 }
+        license: { type: string, enum: [UNKNOWN, CC0-1.0, CC-BY-4.0, ODbL-1.0], default: UNKNOWN }
+        publicationConsent: { type: boolean }
+    AedProposalImportResult:
+      type: object
+      required: [created, skipped, errors]
+      properties:
+        created: { type: integer }
+        skipped: { type: integer }
+        errors: { type: array, items: { $ref: "#/components/schemas/ProposalImportError" } }
+    ProposalImportError:
+      type: object
+      required: [row, message]
+      properties:
+        row: { type: integer }
+        message: { type: string }
+    ConflictReport:
+      type: object
+      required: [id, aedId, aedName, message, sourceName, status, reviewNote, revision, createdAt]
+      properties:
+        id: { type: string }
+        aedId: { type: string }
+        aedName: { type: string }
+        message: { type: string }
+        sourceName: { type: string }
+        status: { type: string, enum: [NEW, UNCOMPLETED, DONE, REJECTED] }
+        reviewNote: { type: string }
+        revision: { type: integer }
+        createdAt: { type: string }
+        photoId: { type: [string, "null"] }
+        target: { $ref: "#/components/schemas/Aed" }
+        submitterName: { type: string }
+    ConflictReportPage:
+      type: object
+      required: [items, total, page]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/ConflictReport" } }
+        total: { type: integer }
+        page: { type: integer }
+    ConflictReportDecision:
+      type: object
+      required: [status, revision, note]
+      properties:
+        status: { type: string, enum: [DONE, REJECTED] }
+        correction: { $ref: "#/components/schemas/AdminRecordUpdateInput" }
+        revision: { type: integer, minimum: 1 }
+        note: { type: string, minLength: 3, maxLength: 2000 }
+    AedInput:
+      type: object
+      required: [name, address, city, latitude, longitude, accessibility, sourceName, sourceUrl, license]
+      properties:
+        name: { type: string, maxLength: 160 }
+        address: { type: string, maxLength: 240 }
+        city: { type: string, maxLength: 120 }
+        postalCode: { type: string, maxLength: 10 }
+        voivodeship: { type: string, maxLength: 100 }
+        latitude: { type: [number, "null"], minimum: 49, maximum: 55 }
+        longitude: { type: [number, "null"], minimum: 14, maximum: 24.2 }
+        description: { type: string, maxLength: 2000 }
+        placement: { type: string, enum: [indoor, outdoor, unknown], default: unknown }
+        accessibility: { type: string, enum: [24/7, limited, unknown] }
+        openingHours: { type: string, maxLength: 200 }
+        sourceName: { type: string, minLength: 2, maxLength: 200 }
+        sourceUrl: { type: string, maxLength: 1000 }
+        license: { type: string, minLength: 2, maxLength: 200 }
+        locationToken: { type: string, maxLength: 10000 }
+        publicationConsent: { type: boolean }
+    SubmissionLocationRequest:
+      type: object
+      required: [latitude, longitude, accuracy, capturedAt]
+      properties:
+        latitude: { type: number, minimum: 49, maximum: 55 }
+        longitude: { type: number, minimum: 14, maximum: 24.2 }
+        accuracy: { type: number, minimum: 0, maximum: 100 }
+        capturedAt: { type: number }
+    SubmissionLocation:
+      type: object
+      required: [latitude, longitude, accuracy, address, city, postalCode, voivodeship, addressStatus, locationToken]
+      properties:
+        latitude: { type: number }
+        longitude: { type: number }
+        accuracy: { type: number }
+        address: { type: string }
+        city: { type: string }
+        postalCode: { type: string }
+        voivodeship: { type: string }
+        addressStatus: { type: string, enum: [RESOLVED, UNRESOLVED] }
+        locationToken: { type: string }
+    Aed:
+      allOf:
+        - { $ref: "#/components/schemas/AedInput" }
+        - type: object
+          required: [id, verificationStatus, operationalStatus, qualityScore, qualityIssues, isDemo, createdAt, updatedAt]
+          properties:
+            id: { type: string }
+            verificationStatus: { type: string, enum: [VERIFIED, NOT_VERIFIED, REJECTED, pending, verified, rejected, unverified] }
+            completenessStatus: { type: string, enum: [COMPLETE, INCOMPLETE] }
+            revision: { type: string }
+            locationEvidence: { type: object, additionalProperties: true }
+            operationalStatus: { type: string, enum: [OPERATIONAL, OUT_OF_SERVICE, UNKNOWN] }
+            recordVerificationStatus: { type: string, enum: [VERIFIED_BY_OPERATOR, VERIFIED_BY_AUTHORIZED_REVIEWER, UNVERIFIED, DISPUTED] }
+            verifiedAt: { type: [string, "null"] }
+            verificationEvidence: { type: object, additionalProperties: true }
+            sourceCategory: { $ref: "#/components/schemas/SourceCategory" }
+            qualityScore: { type: integer }
+            qualityIssues: { type: array, items: { type: string } }
+            isDemo: { type: boolean }
+            lastVerifiedAt: { type: [string, "null"] }
+            organizationId: { type: [string, "null"] }
+            createdAt: { type: string }
+            updatedAt: { type: string }
+            imported: { type: boolean }
+            publicImport: { type: boolean }
+            country: { type: string }
+            responsibleOrganization: { type: [string, "null"] }
+            mergedIntoId: { type: [string, "null"] }
+            deviceIdentifier: { type: [string, "null"] }
+            publicationCount: { type: integer }
+            independentSourceCount: { type: integer }
+            sourceConflict: { type: boolean }
+            provenance: { type: array, items: { $ref: "#/components/schemas/Provenance" } }
+    ExternalAed:
+      type: object
+      required: [id, name, latitude, longitude, address, city, location, openingHours, access, sourceUrl, checkDate]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        address: { type: string }
+        city: { type: string }
+        location: { type: string }
+        openingHours: { type: string }
+        access: { type: string }
+        sourceUrl: { type: string }
+        checkDate: { type: string }
+    NearbyAeds:
+      type: object
+      required: [items, fetchedAt, radiusMeters, license, attribution]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/ExternalAed" } }
+        fetchedAt: { type: string }
+        radiusMeters: { type: integer }
+        license: { type: string }
+        attribution: { type: string }
+    SyncInput:
+      type: object
+      required: [sourceKey]
+      properties:
+        sourceKey: { type: string, enum: [all, dane-gov, openaedmap, przemysl, warszawa, openaed-eu] }
+        mode: { type: string, enum: [sync, append], default: sync }
+    SyncStarted:
+      type: object
+      required: [jobIds, message]
+      properties:
+        jobIds: { type: array, items: { type: string } }
+        message: { type: string }
+    DuplicateDecision:
+      type: object
+      required: [candidateId, action]
+      properties:
+        candidateId: { type: string, format: uuid }
+        action: { type: string, enum: [merge, reject, undo] }
+        keepId: { type: string, format: uuid }
+    ConflictDecision:
+      type: object
+      required: [conflictId, choice]
+      properties:
+        conflictId: { type: string, format: uuid }
+        choice: { type: string, enum: [current, incoming] }
+    Provenance:
+      type: object
+      required: [sourceName, sourceRecordId, sourceUrl, publisher, license, datasetUrl, resourceId, importedAt, lastSyncedAt]
+      properties:
+        sourceName: { type: string }
+        attributes: { type: object, additionalProperties: true }
+        primarySourceKey: { type: [string, "null"] }
+        removedAt: { type: [string, "null"] }
+        sourceCategory: { $ref: "#/components/schemas/SourceCategory" }
+        provenanceEvidence: { type: object, additionalProperties: true }
+        publisherId: { type: [string, "null"] }
+        datasetId: { type: [string, "null"] }
+        datasetTitle: { type: [string, "null"] }
+        resourceFormat: { type: [string, "null"] }
+        publishedAt: { type: [string, "null"] }
+        geographicScope: { type: [string, "null"] }
+        referenceScope: { type: [string, "null"] }
+        reuseConditions: { type: object, additionalProperties: true }
+        sourceRecordId: { type: string }
+        sourceUrl: { type: string }
+        publisher: { type: [string, "null"] }
+        license: { type: string }
+        datasetUrl: { type: [string, "null"] }
+        resourceId: { type: [string, "null"] }
+        importedAt: { type: string }
+        lastSyncedAt: { type: string }
+        sourceModifiedAt: { type: [string, "null"] }
+    ConnectionTestInput:
+      type: object
+      required: [sourceId]
+      properties:
+        sourceId: { type: string, format: uuid }
+    IntegrationSource:
+      type: object
+      required: [id, key, name, publisher, coverage, license, status, message, recordCount, errorCount, lastSuccessAt, lastCheckedAt]
+      properties:
+        syncKey: { type: [string, "null"] }
+        connectionStatus: { type: string }
+        connectionMessage: { type: string }
+        connectionCheckedAt: { type: [string, "null"] }
+        latestImport:
+          type: object
+          required: [processed, validRecords, imported, updated, duplicates, errors]
+          properties:
+            processed: { type: integer }
+            validRecords: { type: [integer, "null"] }
+            imported: { type: integer }
+            updated: { type: integer }
+            duplicates: { type: integer }
+            errors: { type: integer }
+        errorSummary:
+          type: array
+          items:
+            type: object
+            required: [rule, severity, count, message]
+            properties:
+              rule: { type: string }
+              severity: { type: string }
+              count: { type: integer }
+              message: { type: string }
+        id: { type: string }
+        key: { type: string }
+        name: { type: string }
+        sourceCategory: { $ref: "#/components/schemas/SourceCategory" }
+        datasetUrl: { type: string }
+        lastUpdatedAt: { type: [string, "null"] }
+        lastSyncedAt: { type: [string, "null"] }
+        provenanceEvidence: { type: object, additionalProperties: true }
+        publisher: { type: string }
+        coverage: { type: string }
+        license: { type: string }
+        status: { type: string }
+        message: { type: string }
+        recordCount: { type: integer }
+        newAeds: { type: integer }
+        matchedRecords: { type: integer }
+        conflictCount: { type: integer }
+        lastErrorAt: { type: [string, "null"] }
+        sourceType: { type: string }
+        errorCount: { type: integer }
+        lastSuccessAt: { type: [string, "null"] }
+        lastCheckedAt: { type: [string, "null"] }
+    IntegrationJob:
+      type: object
+      required: [id, sourceId, status, processed, imported, updated, skipped, errors, createdAt, finishedAt]
+      properties:
+        id: { type: string }
+        sourceId: { type: string }
+        status: { type: string }
+        processed: { type: integer }
+        imported: { type: integer }
+        updated: { type: integer }
+        skipped: { type: integer }
+        errors: { type: integer }
+        createdAt: { type: string }
+        finishedAt: { type: [string, "null"] }
+        summary: { type: object, additionalProperties: true }
+    IntegrationError:
+      type: object
+      required: [id, sourceId, jobId, severity, rule, message, sourceRecordId, createdAt]
+      properties:
+        id: { type: string }
+        sourceId: { type: string }
+        jobId: { type: string }
+        severity: { type: string }
+        rule: { type: string }
+        message: { type: string }
+        sourceRecordId: { type: [string, "null"] }
+        createdAt: { type: string }
+    OriginalRecord:
+      type: object
+      required: [id, aedId, sourceId, sourceRecordId, sourceUrl, license, publisher, importedAt, lastSyncedAt, originalRecord]
+      properties:
+        id: { type: string }
+        aedId: { type: [string, "null"] }
+        sourceId: { type: [string, "null"] }
+        sourceRecordId: { type: string }
+        sourceUrl: { type: string }
+        license: { type: string }
+        publisher: { type: [string, "null"] }
+        importedAt: { type: string }
+        lastSyncedAt: { type: string }
+        originalRecord: { type: object, additionalProperties: true }
+    DuplicateReview:
+      type: object
+      required: [id, reason, status, first, second, originals]
+      properties:
+        id: { type: string }
+        reason: { type: string }
+        score: { type: integer }
+        evidence: { type: object, additionalProperties: true }
+        blockingConflict: { type: boolean }
+        status: { type: string }
+        first: { $ref: "#/components/schemas/Aed" }
+        second: { $ref: "#/components/schemas/Aed" }
+        originals: { type: array, items: { $ref: "#/components/schemas/OriginalRecord" } }
+    FieldConflict:
+      type: object
+      required: [id, aedId, field, currentValue, incomingValue, status]
+      properties:
+        id: { type: string }
+        aedId: { type: string }
+        field: { type: string }
+        currentValue: {}
+        incomingValue: {}
+        status: { type: string }
+    IntegrationPanel:
+      type: object
+      required: [sources, stats, jobs, errors, records, duplicates, conflicts, page, pageSize, jobTotal, errorTotal, recordTotal, duplicateTotal, conflictTotal, demoReadOnly]
+      properties:
+        mergeHistory:
+          type: array
+          items:
+            type: object
+            required: [id, candidateId, keeperId, loserId, mode, createdAt, undoneAt]
+            properties:
+              id: { type: string }
+              candidateId: { type: string }
+              keeperId: { type: string }
+              loserId: { type: string }
+              mode: { type: string }
+              createdAt: { type: string }
+              undoneAt: { type: [string, "null"] }
+        decisionHistory:
+          type: array
+          items:
+            type: object
+            required: [id, action, createdAt]
+            properties:
+              id: { type: string }
+              action: { type: string }
+              createdAt: { type: string }
+        sources: { type: array, items: { $ref: "#/components/schemas/IntegrationSource" } }
+        stats:
+          type: object
+          required: [importedRecords, canonicalRecords, duplicateCandidates, conflicts, requiringVerification, lastSuccessAt]
+          properties:
+            importedRecords: { type: integer }
+            canonicalRecords: { type: integer }
+            duplicateCandidates: { type: integer }
+            conflicts: { type: integer }
+            requiringVerification: { type: integer }
+            lastSuccessAt: { type: [string, "null"] }
+            multiSourceAeds: { type: integer }
+            activeIntegrations: { type: integer }
+        jobs: { type: array, items: { $ref: "#/components/schemas/IntegrationJob" } }
+        errors: { type: array, items: { $ref: "#/components/schemas/IntegrationError" } }
+        records: { type: array, items: { $ref: "#/components/schemas/OriginalRecord" } }
+        duplicates: { type: array, items: { $ref: "#/components/schemas/DuplicateReview" } }
+        conflicts: { type: array, items: { $ref: "#/components/schemas/FieldConflict" } }
+        page: { type: integer }
+        pageSize: { type: integer }
+        jobTotal: { type: integer }
+        errorTotal: { type: integer }
+        recordTotal: { type: integer }
+        duplicateTotal: { type: integer }
+        conflictTotal: { type: integer }
+        demoReadOnly: { type: boolean }
+    ReportInput:
+      type: object
+      required: [aedId, message]
+      properties:
+        photoId: { type: [string, "null"] }
+        aedId: { type: string, format: uuid }
+        message: { type: string, minLength: 10, maxLength: 2000 }
+    ReviewInput:
+      type: object
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [verified, rejected] }
+    Stats:
+      type: object
+      required: [total, verified, sources, pending, averageQuality, cities, isDemo, integrationCount, independentPublisherCount, uniqueAedCount]
+      properties:
+        total: { type: integer }
+        verified: { type: integer }
+        sources:
+          type: integer
+          description: Zgodnościowy alias integrationCount; kanały integracyjne bez ponownego liczenia zbiorów odkrytych przez katalog.
+        integrationCount:
+          type: integer
+          description: Zarejestrowane integracje techniczne, w tym katalog i WMS, także niedostępne. Zbiory odkryte w katalogu nie są kolejnymi integracjami.
+        independentPublisherCount:
+          type: integer
+          description: Rozpoznani wydawcy zbiorów AED po zgrupowaniu potwierdzonych aliasów. Katalogi i warstwy pomocnicze nie są wydawcami.
+        uniqueAedCount:
+          type: integer
+          description: Kanoniczne, niescalone AED dostępne dla danego użytkownika; anonimowo tylko rekordy publiczne z lokalizacją.
+        pending: { type: integer }
+        averageQuality: { type: integer }
+        cities: { type: integer }
+        isDemo: { type: boolean }
+    Source:
+      type: object
+      required: [id, name, url, license, coverage, institution, datasetId, updateFrequency, authoritativeScope, status, statusMessage]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        url: { type: string }
+        license: { type: string }
+        coverage: { type: string }
+        institution: { type: string }
+        datasetId: { type: string }
+        updateFrequency: { type: string }
+        authoritativeScope: { type: string }
+        status: { type: string }
+        statusMessage: { type: string }
+        lastCheckedAt: { type: [string, "null"] }
+    ExportFieldOrigin:
+      type: object
+      required: [publicationId, fields, license]
+      properties:
+        publicationId: { type: string }
+        fields: { type: array, items: { type: string } }
+        license: { type: string }
+    ExportDecision:
+      type: object
+      required: [aedId, decision, reasons, licenses, publicationIds, relationship]
+      properties:
+        aedId: { type: string }
+        decision: { type: string, enum: [EXPORTED, SKIPPED, MANUAL_REVIEW] }
+        reasons: { type: array, items: { type: string } }
+        licenses: { type: array, items: { type: string } }
+        publicationIds: { type: array, items: { type: string } }
+        relationship: { type: string, enum: [SINGLE_SOURCE, SEPARATE_PUBLICATIONS, REPUBLICATION, DERIVED_OR_UNRESOLVED] }
+        publicationChecks:
+          type: array
+          items:
+            type: object
+            required: [publicationId, license, verified, reason]
+            properties:
+              publicationId: { type: string }
+              license: { type: string }
+              verified: { type: boolean }
+              reason: { type: string }
+              evidenceUrl: { type: string }
+              evidenceSha256: { type: string }
+    SourceDirectoryEntry:
+      allOf:
+        - $ref: "#/components/schemas/Source"
+        - type: object
+          required: [section, endpoints, memberSources, groupingEvidence]
+          properties:
+            section: { type: string, enum: [aed, catalogue, auxiliary] }
+            endpoints: { type: array, items: { type: string } }
+            memberSources: { type: array, items: { $ref: "#/components/schemas/Source" } }
+            groupingEvidence: { type: array, items: { type: string } }
+    Activity:
+      type: object
+      required: [id, action, createdAt]
+      properties:
+        id: { type: string }
+        action: { type: string }
+        createdAt: { type: string }
+    Workspace:
+      type: object
+      required: [records, ownRecords, activity, role]
+      properties:
+        records: { type: array, items: { $ref: "#/components/schemas/Aed" } }
+        ownRecords: { type: array, items: { $ref: "#/components/schemas/Aed" } }
+        activity: { type: array, items: { $ref: "#/components/schemas/Activity" } }
+        role: { type: string }
+    McodIntegrationStatus:
+      type: object
+      required: [baseUrl, enabled, secretConfigured, connectionStatus, contractStatus, writesEnabled, automaticSyncEnabled]
+      properties:
+        baseUrl: { type: string }
+        enabled: { type: boolean }
+        secretConfigured: { type: boolean }
+        connectionStatus: { type: string, enum: [NOT_CHECKED] }
+        contractStatus: { type: string, enum: [NOT_VERIFIED] }
+        writesEnabled: { type: boolean }
+        automaticSyncEnabled: { type: boolean }
+        syncEnabled: { type: boolean }
+    McodEntity:
+      type: object
+      required: [id]
+      additionalProperties: true
+      properties:
+        id: { type: string }
+        status: { type: string }
+        title: { type: string }
+        name: { type: string }
+        organizationId: { type: string }
+    McodWorkspace:
+      type: object
+      required: [status, message, organization, institutionRequests, datasets, resources, plans, drafts, records, events, syncRuns, unconfirmedOperations]
+      properties:
+        status: { $ref: "#/components/schemas/McodIntegrationStatus" }
+        message: { type: string }
+        organization:
+          oneOf:
+            - { $ref: "#/components/schemas/McodEntity" }
+            - { type: "null" }
+        institutionRequests: { type: array, items: { $ref: "#/components/schemas/McodEntity" } }
+        datasets: { type: array, items: { $ref: "#/components/schemas/McodEntity" } }
+        resources: { type: array, items: { $ref: "#/components/schemas/McodEntity" } }
+        plans: { type: array, items: { $ref: "#/components/schemas/McodEntity" } }
+        drafts: { type: array, items: { $ref: "#/components/schemas/McodEntity" } }
+        records: { type: array, items: { $ref: "#/components/schemas/Aed" } }
+        recordStates: { type: array, items: { $ref: "#/components/schemas/McodEntity" } }
+        events: { type: array, items: { $ref: "#/components/schemas/McodEntity" } }
+        syncRuns: { type: array, items: { $ref: "#/components/schemas/McodEntity" } }
+        unconfirmedOperations: { type: array, items: { type: string } }
+    McodInstitutionPage:
+      type: object
+      required: [items, total, page, pageSize, activationRequired]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/McodEntity" } }
+        total: { type: integer }
+        page: { type: integer }
+        pageSize: { type: integer }
+        activationRequired: { type: boolean }
+    McodActionResult:
+      type: object
+      required: [count, message]
+      properties:
+        count: { type: integer }
+        message: { type: string }
+    McodInstitutionApplication:
+      type: object
+      required: [kind, representativeName, representativeRole, representativeEmail]
+      properties:
+        kind: { type: string, enum: [EXISTING, NEW] }
+        organizationName: { type: string, maxLength: 500 }
+        institutionId: { type: string, maxLength: 200 }
+        representativeName: { type: string, minLength: 2, maxLength: 300 }
+        representativeRole: { type: string, minLength: 2, maxLength: 300 }
+        representativeEmail: { type: string, format: email }
+        details: { $ref: "#/components/schemas/McodInstitutionDetails" }
+    McodInstitutionDetails:
+      type: object
+      properties:
+        fullName: { type: string, maxLength: 500 }
+        shortName: { type: string, maxLength: 100 }
+        institutionType: { type: string, maxLength: 100 }
+        address: { type: string, maxLength: 1000 }
+        email: { type: string, format: email }
+        phone: { type: string, maxLength: 50 }
+        website: { type: string, maxLength: 1000 }
+        additionalFields:
+          type: object
+          additionalProperties: { type: string }
+    McodInstitutionReview:
+      type: object
+      required: [decision, expectedRevision, note, representativeVerified]
+      properties:
+        decision: { type: string, enum: [APPROVE, REJECT] }
+        expectedRevision: { type: integer, minimum: 1 }
+        note: { type: string, minLength: 5, maxLength: 4000 }
+        representativeVerified: { type: boolean }
+    McodDatasetDraft:
+      type: object
+      required: [institutionRequestId, title]
+      properties:
+        institutionRequestId: { type: string, format: uuid }
+        title: { type: string, minLength: 2, maxLength: 500 }
+        description: { type: string, maxLength: 10000, default: "" }
+    McodPublicationDraft:
+      type: object
+      required: [datasetId, format]
+      properties:
+        datasetId: { type: string, format: uuid }
+        format: { type: string, enum: [csv, geojson] }
+    McodAedDraftInput:
+      type: object
+      required: [payload]
+      properties:
+        targetAedId: { type: string, format: uuid }
+        payload:
+          type: object
+          additionalProperties: true
+        expectedRevision: { type: integer, minimum: 1 }
+    McodDraftSubmission:
+      type: object
+      required: [expectedRevision, publicationConsent]
+      properties:
+        expectedRevision: { type: integer, minimum: 1 }
+        publicationConsent: { type: boolean }
+    McodContractOperation:
+      type: object
+      required: [path, method, operationId, summary]
+      properties:
+        path: { type: string }
+        method: { type: string }
+        operationId: { type: [string, "null"] }
+        summary: { type: [string, "null"] }
+    McodContractInspection:
+      type: object
+      required: [openapiVersion, operations, permissionsVerified, writesEnabled]
+      properties:
+        openapiVersion: { type: string }
+        operations:
+          type: array
+          items: { $ref: "#/components/schemas/McodContractOperation" }
+        permissionsVerified: { type: boolean }
+        writesEnabled: { type: boolean }
